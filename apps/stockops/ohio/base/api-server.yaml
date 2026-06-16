@@ -39,7 +39,7 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: "prod"
             - name: STOCKOPS_DATASOURCE_URL
-              value: "jdbc:postgresql://ohio-rds-postgres.cnas28mgerfu.us-east-2.rds.amazonaws.com:5432/stockops"
+              value: "jdbc:postgresql://ohio-rds-postgres.cviu680ggsfb.us-east-2.rds.amazonaws.com:5432/stockops"
             - name: STOCKOPS_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
