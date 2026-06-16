@@ -85,3 +85,8 @@ spec:
               value: "us-east-2"
             - name: STOCKOPS_MQTT_INGESTION_ENABLED
               value: "false"
+            # ── 오하이오는 Read Replica(읽기 전용) → 부팅 시 쓰기 차단 ──
+            - name: SPRING_FLYWAY_ENABLED
+              value: "false"
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "none"
