@@ -6,10 +6,12 @@ kind: Kustomization
 namespace: stockops
 
 resources:
-  - ../../base
+- ../../base
 
 images:
-  - name: 448768137813.dkr.ecr.ap-northeast-2.amazonaws.com/stockops-api
-    newTag: latest   # ← CI 가 ${GITHUB_SHA} 로 교체
-  - name: 448768137813.dkr.ecr.ap-northeast-2.amazonaws.com/stockops-ai
-    newTag: latest   # ← CI 가 ${GITHUB_SHA} 로 교체
+- name: 448768137813.dkr.ecr.ap-northeast-2.amazonaws.com/stockops-ai
+  newName: 448768137813.dkr.ecr.ap-northeast-2.amazonaws.com/stockops-ai
+  newTag: 9afd5d7984551fd7c4751bb5a19877c536c31253
+- name: 448768137813.dkr.ecr.ap-northeast-2.amazonaws.com/stockops-api
+  newName: 448768137813.dkr.ecr.ap-northeast-2.amazonaws.com/stockops-api
+  newTag: 9afd5d7984551fd7c4751bb5a19877c536c31253
