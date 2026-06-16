@@ -15,7 +15,7 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/jinuuuKim/stockops-gitops.git
+    repoURL: https://github.com/jinuuuKim/Stockops-GitOps.git
     targetRevision: main
     path: apps/stockops/ohio/overlays/ohio
 
