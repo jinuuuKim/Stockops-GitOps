@@ -11,7 +11,7 @@ resources:
 images:
 - name: 448768137813.dkr.ecr.us-east-2.amazonaws.com/stockops-ai
   newName: 448768137813.dkr.ecr.us-east-2.amazonaws.com/stockops-ai
-  newTag: f58cb6f3b2dc502feda8bff3f2cad3aa7457d059
+  newTag: 82554c227849189ffbd33d9804b8dee73268a789
 - name: 448768137813.dkr.ecr.us-east-2.amazonaws.com/stockops-api
   newName: 448768137813.dkr.ecr.us-east-2.amazonaws.com/stockops-api
-  newTag: f58cb6f3b2dc502feda8bff3f2cad3aa7457d059
+  newTag: 82554c227849189ffbd33d9804b8dee73268a789
