@@ -1,66 +1,83 @@
-# stockops-gitops
+# StockOps GitOps
 
-StockOps **CD(GitOps) 전용 레포**. ArgoCD 가 이 레포를 단일 진실(source of truth)로 보고
-EKS 에 동기화한다. Terraform(인프라) 과 책임이 분리됨.
+![ArgoCD](https://img.shields.io/badge/ArgoCD-v2.x-%23EF7B4D?style=for-the-badge&logo=argo&logoColor=white)
+![Kustomize](https://img.shields.io/badge/Kustomize-%23326ce5?style=for-the-badge&logo=kubernetes&logoColor=white)
+
+StockOps CD(GitOps) 전용 레포입니다. ArgoCD가 이 레포를 단일 진실(source of truth)로 바라보고 EKS 클러스터에 동기화합니다.
+
+> 인프라(Terraform)는 **[Stockops-Infra](https://github.com/jinuuuKim/Stockops-Infra)**, 애플리케이션 빌드·배포 파이프라인은 **[Stockops-Application](https://github.com/jinuuuKim/Stockops-Application)** 에서 관리합니다.
+
+---
+
+## 디렉토리 구조
 
 ```
-Stockops-GitOps 레포 생성
-apps/stockops/
-  base/                 # 리전 무관 워크로드 (api-server, ai-module)
-  overlays/seoul/       # 네임스페이스 + 이미지 태그 주입(CI가 SHA 갱신)
-argocd/
-  stockops-seoul-application.yaml   # ArgoCD Application (서울)
+Stockops-GitOps/
+├── apps/
+│   └── stockops/
+│       ├── seoul/
+│       │   ├── base/             # 리전 공통 워크로드 (api-server, ai-module Deployment)
+│       │   └── overlays/         # 서울 전용 — 네임스페이스·이미지 태그 (CI가 SHA 갱신)
+│       └── ohio/
+│           ├── base/             # 리전 공통 워크로드
+│           └── overlays/         # 오하이오 전용 — 네임스페이스·이미지 태그
+└── argocd/
+    ├── stockops-seoul-application.yaml   # ArgoCD Application (서울 클러스터)
+    └── stockops-ohio-application.yaml    # ArgoCD Application (오하이오 클러스터)
 ```
+
+---
 
 ## 소유 경계
-- **Terraform**: VPC/EKS/ALB/RDS/ECR, ESO, LBC, ArgoCD 설치, aws-auth, IRSA,
-  Service, TargetGroupBinding, HPA, Redis, namespace.
-- **이 레포(ArgoCD)**: `stockops-api` / `stockops-ai` **Deployment 만**.
 
-> replicas 는 HPA(Terraform)가 소유 → manifest 에 replicas 없음 +
-> Application 의 `ignoreDifferences: /spec/replicas`.
+| 소유자 | 관리 대상 |
+|--------|-----------|
+| **Terraform (Stockops-Infra)** | VPC · EKS · ALB · RDS · ECR · ESO · LBC · ArgoCD 설치 · aws-auth · IRSA · Service · TargetGroupBinding · HPA · Redis · Namespace |
+| **이 레포 (ArgoCD)** | `stockops-api` · `stockops-ai` **Deployment만** |
+
+> `replicas`는 HPA(Terraform 소유)가 관리합니다. manifest에 `replicas` 필드가 없으며, ArgoCD Application에 `ignoreDifferences: /spec/replicas`가 설정되어 있습니다.
 
 ---
 
-## 0. 레포 생성 / 푸시
-```bash
-# 이 디렉토리에서
-git init -b main
-git add .
-git commit -m "init: stockops gitops scaffold (seoul api+ai)"
-git remote add origin https://github.com/<ORG>/stockops-gitops.git
-git push -u origin main
-```
-`argocd/stockops-seoul-application.yaml` 의 `repoURL` 을 위 주소로 교체.
+## 배포 흐름
 
-## 1. 로컬 렌더 확인(클러스터 영향 없음)
-```bash
-kubectl kustomize apps/stockops/overlays/seoul   # 에러 없이 두 Deployment 가 나오면 OK
+```
+Stockops-Application (GitHub Actions)
+    └─ 이미지 빌드 → ECR push (서울/오하이오)
+         └─ overlays/kustomization.yaml 이미지 SHA 업데이트 commit/push
+              └─ ArgoCD가 변경 감지 → 자동 sync
+                   ├─ seoul-cluster: apps/stockops/seoul/overlays
+                   └─ ohio-cluster:  apps/stockops/ohio/overlays
 ```
 
-## 2. cutover (다음 단계에서 진행) — 요약
-> 무중단 핵심: **Terraform 추적만 끊고(live 유지) → ArgoCD 가 입양.**
+---
+
+## ArgoCD Application 등록
+
+EKS 클러스터를 새로 생성한 후에는 ArgoCD Application을 수동으로 등록해야 합니다.
+
 ```powershell
-# (a) Terraform 에서 Deployment 추적 해제 (live 파드는 안 죽음)
-cd seoul
-terraform state rm kubernetes_deployment_v1.api_server
-terraform state rm kubernetes_deployment_v1.ai_module
-#   → 그리고 kubernetes.tf 에서 두 Deployment 블록 삭제(다음 apply 때 재생성 방지)
+kubectl apply -f argocd/stockops-seoul-application.yaml \
+  --context arn:aws:eks:ap-northeast-2:448768137813:cluster/seoul-cluster
 
-# (b) ArgoCD 에 Application 등록 (처음엔 automated 주석 후 수동 sync 로 diff 확인)
-kubectl apply -f argocd/stockops-seoul-application.yaml
-#   ArgoCD UI 에서 stockops-seoul → SYNC. OutOfSync 차이가 image/replicas 정도면 정상.
-#   확인되면 automated(prune/selfHeal) 켜고 재적용.
+kubectl apply -f argocd/stockops-ohio-application.yaml \
+  --context arn:aws:eks:us-east-2:448768137813:cluster/ohio-cluster
+
+# 등록 확인
+kubectl get application -n argocd \
+  --context arn:aws:eks:ap-northeast-2:448768137813:cluster/seoul-cluster
+kubectl get application -n argocd \
+  --context arn:aws:eks:us-east-2:448768137813:cluster/ohio-cluster
 ```
 
-## 3. CI 연결 (다음 단계)
-`deploy.yml` 에서 `kubectl rollout restart` 제거 → 빌드/푸시 후 이 레포의
-`overlays/seoul/kustomization.yaml` 의 `newTag` 를 빌드 SHA 로 바꿔 commit/push.
-ArgoCD 가 감지해 자동 배포.
-
 ---
-## 오하이오 확장
-`overlays/ohio/` 추가(ECR newName=오하이오, 리전 종속 env 패치) +
-`argocd/stockops-ohio-application.yaml`(destination.server = 오하이오 클러스터) 또는
-ApplicationSet 클러스터 제너레이터로 일괄.
 
+## manifest 직접 수정
+
+환경변수·리소스(requests/limits) 변경은 이 레포의 overlay를 직접 수정하고 push하면 ArgoCD가 자동으로 클러스터에 반영합니다.
+
+```bash
+# 로컬 렌더 확인 (클러스터에 영향 없음)
+kubectl kustomize apps/stockops/seoul/overlays
+kubectl kustomize apps/stockops/ohio/overlays
+```
